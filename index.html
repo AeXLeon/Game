@@ -44,7 +44,7 @@
     <div id="menu">
         <h1>Welcome to the 3D Open World Game</h1>
         <button onclick="startGame()">Start Game</button>
-        <button onclick="alert('Game Info: Use W, A, S, D to move and mouse to look around.')">How to Play</button>
+        <button onclick="alert('Game Info: Use W, A, S, D to move, SPACE to jump, and mouse to look around.')">How to Play</button>
     </div>
     <canvas id="gameCanvas"></canvas>
 
@@ -74,6 +74,7 @@
         const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
         scene.add(ground);
 
         // Add some trees
@@ -97,8 +98,11 @@
         }
 
         // Movement variables
-        const keys = { w: false, a: false, s: false, d: false };
+        const keys = { w: false, a: false, s: false, d: false, space: false };
         const speed = 0.1;
+        const gravity = -0.02;
+        let velocityY = 0;
+        let isOnGround = true;
 
         function handleKeyDown(event) {
             keys[event.key.toLowerCase()] = true;
@@ -148,6 +152,21 @@
             if (keys.s) cameraHolder.position.addScaledVector(forward, -speed);
             if (keys.a) cameraHolder.position.addScaledVector(right, -speed);
             if (keys.d) cameraHolder.position.addScaledVector(right, speed);
+
+            // Gravity and jumping
+            if (isOnGround && keys.space) {
+                velocityY = 0.3; // Jump strength
+                isOnGround = false;
+            }
+
+            velocityY += gravity; // Apply gravity
+            cameraHolder.position.y += velocityY; // Update vertical position
+
+            if (cameraHolder.position.y <= 1.6) { // Ground collision
+                cameraHolder.position.y = 1.6;
+                isOnGround = true;
+                velocityY = 0;
+            }
         }
 
         function animate() {
