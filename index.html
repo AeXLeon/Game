@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Multiplayer Game</title>
+    <title>3D Open World Game</title>
     <style>
         body {
             margin: 0;
@@ -39,175 +39,165 @@
             background: #0056b3;
         }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
     <div id="menu">
-        <h1>Welcome to the 3D Multiplayer Game</h1>
+        <h1>Welcome to the 3D Open World Game</h1>
         <button onclick="startGame()">Start Game</button>
         <button onclick="alert('Game Info: Use W, A, S, D to move, SPACE to jump, and mouse to look around.')">How to Play</button>
     </div>
     <canvas id="gameCanvas"></canvas>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         const menu = document.getElementById('menu');
         const canvas = document.getElementById('gameCanvas');
         const renderer = new THREE.WebGLRenderer({ canvas });
         renderer.setSize(window.innerWidth, window.innerHeight);
 
+        // Scene and Camera Setup
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB);
+        scene.background = new THREE.Color(0x87CEEB); // Sky color
 
+        // Perspective camera with an added camera holder for rotation
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.6, 5);
-
-        const cameraHolder = new THREE.Object3D();
+        camera.position.set(0, 1.6, 5); // Starting position for first-person perspective
+        
+        const cameraHolder = new THREE.Object3D(); // A container for the camera for easy rotation
         cameraHolder.add(camera);
         scene.add(cameraHolder);
 
+        // Lighting to illuminate the scene
         const light = new THREE.DirectionalLight(0xffffff, 1);
         light.position.set(5, 10, 5).normalize();
         scene.add(light);
 
-        const groundGeometry = new THREE.PlaneGeometry(100, 100);
-        const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
+        // Ground creation (Plane geometry)
+        const groundGeometry = new THREE.PlaneGeometry(100, 100); // Large ground size
+        const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 }); // Grass-like color
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
+        ground.rotation.x = -Math.PI / 2; // Make it horizontal
+        ground.receiveShadow = true; // Allow shadows
         ground.position.y = 0;
         scene.add(ground);
 
-        const players = {}; // Track all players
-        const socket = io();
+        // Function to create a tree (with trunk and leaves)
+        const treeMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 }); // Trunk material
+        const leafMaterial = new THREE.MeshPhongMaterial({ color: 0x006400 }); // Leaf material
 
-        socket.on('current-players', (data) => {
-            for (const [id, playerData] of Object.entries(data)) {
-                if (!players[id]) {
-                    addPlayer(id, playerData);
-                }
-            }
-        });
+        function createTree(x, z) {
+            // Tree trunk
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2), treeMaterial);
+            trunk.position.set(x, 1, z);
+            trunk.castShadow = true;
+            scene.add(trunk);
 
-        socket.on('player-joined', (data) => {
-            addPlayer(data.id, data);
-        });
-
-        socket.on('update-position', (data) => {
-            const player = players[data.id];
-            if (player) {
-                player.position.set(data.x, data.y, data.z);
-                player.rotation.y = data.rotationY;
-            }
-        });
-
-        socket.on('player-left', (id) => {
-            if (players[id]) {
-                scene.remove(players[id]);
-                delete players[id];
-            }
-        });
-
-        function addPlayer(id, data) {
-            const geometry = new THREE.BoxGeometry(1, 1.6, 1);
-            const material = new THREE.MeshPhongMaterial({ color: 0x0000FF });
-            const player = new THREE.Mesh(geometry, material);
-            player.position.set(data.x, data.y, data.z);
-            scene.add(player);
-            players[id] = player;
+            // Tree leaves
+            const leaves = new THREE.Mesh(new THREE.SphereGeometry(1), leafMaterial);
+            leaves.position.set(x, 2.5, z);
+            leaves.castShadow = true;
+            scene.add(leaves);
         }
 
-        const keys = { w: false, a: false, s: false, d: false, space: false };
-        const speed = 0.1;
-        const gravity = -0.02;
-        let velocityY = 0;
-        let isOnGround = true;
+        // Add multiple trees randomly placed
+        for (let i = 0; i < 20; i++) {
+            const x = Math.random() * 100 - 50; // Random X position
+            const z = Math.random() * 100 - 50; // Random Z position
+            createTree(x, z);
+        }
+
+        // Movement and physics variables
+        const keys = { w: false, a: false, s: false, d: false, space: false }; // Tracks key states
+        const speed = 0.1; // Movement speed
+        const gravity = -0.02; // Gravity effect
+        let velocityY = 0; // Vertical velocity
+        let isOnGround = true; // Ground state tracker
 
         function handleKeyDown(event) {
-            keys[event.key.toLowerCase()] = true;
+            keys[event.key.toLowerCase()] = true; // Mark key as pressed
         }
 
         function handleKeyUp(event) {
-            keys[event.key.toLowerCase()] = false;
+            keys[event.key.toLowerCase()] = false; // Mark key as released
         }
 
         document.addEventListener('keydown', handleKeyDown);
         document.addEventListener('keyup', handleKeyUp);
 
-        const lookSpeed = 0.002;
-        let isPointerLocked = false;
+        // Mouse look functionality for first-person perspective
+        const lookSpeed = 0.002; // Mouse sensitivity
+        let isPointerLocked = false; // Tracks pointer lock state
 
         canvas.addEventListener('click', () => {
-            canvas.requestPointerLock();
+            canvas.requestPointerLock(); // Enable pointer lock on click
         });
 
         document.addEventListener('pointerlockchange', () => {
-            isPointerLocked = document.pointerLockElement === canvas;
+            isPointerLocked = document.pointerLockElement === canvas; // Update lock state
         });
 
         document.addEventListener('mousemove', (event) => {
             if (isPointerLocked) {
-                cameraHolder.rotation.y -= event.movementX * lookSpeed;
-                camera.rotation.x -= event.movementY * lookSpeed;
+                cameraHolder.rotation.y -= event.movementX * lookSpeed; // Horizontal rotation
+                camera.rotation.x -= event.movementY * lookSpeed; // Vertical rotation
+                // Restrict vertical rotation to prevent flipping
                 camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
             }
         });
 
+        // Function to handle movement and physics
         function updateMovement() {
             const forward = new THREE.Vector3(
                 -Math.sin(cameraHolder.rotation.y),
                 0,
                 -Math.cos(cameraHolder.rotation.y)
-            ).normalize();
+            ).normalize(); // Forward direction vector
 
             const right = new THREE.Vector3(
                 Math.cos(cameraHolder.rotation.y),
                 0,
                 -Math.sin(cameraHolder.rotation.y)
-            ).normalize();
+            ).normalize(); // Right direction vector
 
-            if (keys.w) cameraHolder.position.addScaledVector(forward, speed);
-            if (keys.s) cameraHolder.position.addScaledVector(forward, -speed);
-            if (keys.a) cameraHolder.position.addScaledVector(right, -speed);
-            if (keys.d) cameraHolder.position.addScaledVector(right, speed);
+            if (keys.w) cameraHolder.position.addScaledVector(forward, speed); // Move forward
+            if (keys.s) cameraHolder.position.addScaledVector(forward, -speed); // Move backward
+            if (keys.a) cameraHolder.position.addScaledVector(right, -speed); // Move left
+            if (keys.d) cameraHolder.position.addScaledVector(right, speed); // Move right
 
+            // Handle jump
             if (isOnGround && keys.space) {
-                velocityY = 0.3;
+                velocityY = 0.3; // Jump strength
                 isOnGround = false;
             }
 
-            velocityY += gravity;
-            cameraHolder.position.y += velocityY;
+            velocityY += gravity; // Apply gravity
+            cameraHolder.position.y += velocityY; // Update vertical position
 
+            // Ground collision detection
             if (cameraHolder.position.y <= 1.6) {
-                cameraHolder.position.y = 1.6;
+                cameraHolder.position.y = 1.6; // Reset to ground level
                 isOnGround = true;
                 velocityY = 0;
             }
-
-            socket.emit('update-position', {
-                x: cameraHolder.position.x,
-                y: cameraHolder.position.y,
-                z: cameraHolder.position.z,
-                rotationY: cameraHolder.rotation.y
-            });
         }
 
+        // Animation loop
         function animate() {
-            updateMovement();
-            renderer.render(scene, camera);
-            requestAnimationFrame(animate);
+            updateMovement(); // Update player movement
+            renderer.render(scene, camera); // Render the scene
+            requestAnimationFrame(animate); // Loop the animation
         }
 
         function startGame() {
-            menu.style.display = 'none';
-            animate();
+            menu.style.display = 'none'; // Hide the menu
+            animate(); // Start the game loop
         }
 
+        // Handle window resize to adjust the canvas
         window.addEventListener('resize', () => {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight); // Update renderer size
+            camera.aspect = window.innerWidth / window.innerHeight; // Adjust camera aspect ratio
+            camera.updateProjectionMatrix(); // Update projection
         });
     </script>
 </body>
