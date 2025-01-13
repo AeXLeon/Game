@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Open World Game</title>
+    <title>3D Multiplayer Game</title>
     <style>
         body {
             margin: 0;
@@ -39,16 +39,17 @@
             background: #0056b3;
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
     <div id="menu">
-        <h1>Welcome to the 3D Open World Game</h1>
+        <h1>Welcome to the 3D Multiplayer Game</h1>
         <button onclick="startGame()">Start Game</button>
         <button onclick="alert('Game Info: Use W, A, S, D to move, SPACE to jump, and mouse to look around.')">How to Play</button>
     </div>
     <canvas id="gameCanvas"></canvas>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         const menu = document.getElementById('menu');
         const canvas = document.getElementById('gameCanvas');
@@ -69,7 +70,6 @@
         light.position.set(5, 10, 5).normalize();
         scene.add(light);
 
-        // Create a ground plane
         const groundGeometry = new THREE.PlaneGeometry(100, 100);
         const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
@@ -78,29 +78,45 @@
         ground.position.y = 0;
         scene.add(ground);
 
-        // Add some trees
-        const treeMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
-        const leafMaterial = new THREE.MeshPhongMaterial({ color: 0x006400 });
+        const players = {}; // Track all players
+        const socket = io();
 
-        function createTree(x, z) {
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2), treeMaterial);
-            trunk.position.set(x, 1, z);
-            trunk.castShadow = true;
-            scene.add(trunk);
+        socket.on('current-players', (data) => {
+            for (const [id, playerData] of Object.entries(data)) {
+                if (!players[id]) {
+                    addPlayer(id, playerData);
+                }
+            }
+        });
 
-            const leaves = new THREE.Mesh(new THREE.SphereGeometry(1), leafMaterial);
-            leaves.position.set(x, 2.5, z);
-            leaves.castShadow = true;
-            scene.add(leaves);
+        socket.on('player-joined', (data) => {
+            addPlayer(data.id, data);
+        });
+
+        socket.on('update-position', (data) => {
+            const player = players[data.id];
+            if (player) {
+                player.position.set(data.x, data.y, data.z);
+                player.rotation.y = data.rotationY;
+            }
+        });
+
+        socket.on('player-left', (id) => {
+            if (players[id]) {
+                scene.remove(players[id]);
+                delete players[id];
+            }
+        });
+
+        function addPlayer(id, data) {
+            const geometry = new THREE.BoxGeometry(1, 1.6, 1);
+            const material = new THREE.MeshPhongMaterial({ color: 0x0000FF });
+            const player = new THREE.Mesh(geometry, material);
+            player.position.set(data.x, data.y, data.z);
+            scene.add(player);
+            players[id] = player;
         }
 
-        for (let i = 0; i < 20; i++) {
-            const x = Math.random() * 100 - 50;
-            const z = Math.random() * 100 - 50;
-            createTree(x, z);
-        }
-
-        // Movement variables
         const keys = { w: false, a: false, s: false, d: false, space: false };
         const speed = 0.1;
         const gravity = -0.02;
@@ -118,7 +134,6 @@
         document.addEventListener('keydown', handleKeyDown);
         document.addEventListener('keyup', handleKeyUp);
 
-        // Mouse look
         const lookSpeed = 0.002;
         let isPointerLocked = false;
 
@@ -156,20 +171,26 @@
             if (keys.a) cameraHolder.position.addScaledVector(right, -speed);
             if (keys.d) cameraHolder.position.addScaledVector(right, speed);
 
-            // Gravity and jumping
             if (isOnGround && keys.space) {
-                velocityY = 0.3; // Jump strength
+                velocityY = 0.3;
                 isOnGround = false;
             }
 
-            velocityY += gravity; // Apply gravity
-            cameraHolder.position.y += velocityY; // Update vertical position
+            velocityY += gravity;
+            cameraHolder.position.y += velocityY;
 
-            if (cameraHolder.position.y <= 1.6) { // Ground collision
+            if (cameraHolder.position.y <= 1.6) {
                 cameraHolder.position.y = 1.6;
                 isOnGround = true;
                 velocityY = 0;
             }
+
+            socket.emit('update-position', {
+                x: cameraHolder.position.x,
+                y: cameraHolder.position.y,
+                z: cameraHolder.position.z,
+                rotationY: cameraHolder.rotation.y
+            });
         }
 
         function animate() {
