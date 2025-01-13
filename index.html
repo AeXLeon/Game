@@ -75,6 +75,7 @@
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
+        ground.position.y = 0;
         scene.add(ground);
 
         // Add some trees
@@ -84,10 +85,12 @@
         function createTree(x, z) {
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2), treeMaterial);
             trunk.position.set(x, 1, z);
+            trunk.castShadow = true;
             scene.add(trunk);
 
             const leaves = new THREE.Mesh(new THREE.SphereGeometry(1), leafMaterial);
             leaves.position.set(x, 2.5, z);
+            leaves.castShadow = true;
             scene.add(leaves);
         }
 
