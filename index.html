@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Game</title>
+    <title>3D Open World Game</title>
     <style>
         body {
             margin: 0;
@@ -42,9 +42,9 @@
 </head>
 <body>
     <div id="menu">
-        <h1>Welcome to the 3D Game</h1>
+        <h1>Welcome to the 3D Open World Game</h1>
         <button onclick="startGame()">Start Game</button>
-        <button onclick="alert('Game Info: Use W, A, S, D to move.')">How to Play</button>
+        <button onclick="alert('Game Info: Use W, A, S, D to move and mouse to look around.')">How to Play</button>
     </div>
     <canvas id="gameCanvas"></canvas>
 
@@ -59,20 +59,95 @@
         scene.background = new THREE.Color(0x87CEEB);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 5;
+        camera.position.set(0, 1.6, 5);
 
         const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(5, 5, 5).normalize();
+        light.position.set(5, 10, 5).normalize();
         scene.add(light);
 
-        const geometry = new THREE.BoxGeometry();
-        const material = new THREE.MeshPhongMaterial({ color: 0x44aa88 });
-        const cube = new THREE.Mesh(geometry, material);
-        scene.add(cube);
+        // Create a ground plane
+        const groundGeometry = new THREE.PlaneGeometry(100, 100);
+        const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        scene.add(ground);
+
+        // Add some trees
+        const treeMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+        const leafMaterial = new THREE.MeshPhongMaterial({ color: 0x006400 });
+
+        function createTree(x, z) {
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2), treeMaterial);
+            trunk.position.set(x, 1, z);
+            scene.add(trunk);
+
+            const leaves = new THREE.Mesh(new THREE.SphereGeometry(1), leafMaterial);
+            leaves.position.set(x, 2.5, z);
+            scene.add(leaves);
+        }
+
+        for (let i = 0; i < 20; i++) {
+            const x = Math.random() * 100 - 50;
+            const z = Math.random() * 100 - 50;
+            createTree(x, z);
+        }
+
+        // Movement variables
+        const keys = { w: false, a: false, s: false, d: false };
+        const speed = 0.1;
+
+        function handleKeyDown(event) {
+            keys[event.key.toLowerCase()] = true;
+        }
+
+        function handleKeyUp(event) {
+            keys[event.key.toLowerCase()] = false;
+        }
+
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
+
+        // Mouse look
+        const lookSpeed = 0.002;
+        let isPointerLocked = false;
+
+        canvas.addEventListener('click', () => {
+            canvas.requestPointerLock();
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            isPointerLocked = document.pointerLockElement === canvas;
+        });
+
+        document.addEventListener('mousemove', (event) => {
+            if (isPointerLocked) {
+                camera.rotation.y -= event.movementX * lookSpeed;
+                camera.rotation.x -= event.movementY * lookSpeed;
+                camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+            }
+        });
+
+        function updateMovement() {
+            const forward = new THREE.Vector3(
+                -Math.sin(camera.rotation.y),
+                0,
+                -Math.cos(camera.rotation.y)
+            ).normalize();
+
+            const right = new THREE.Vector3(
+                Math.cos(camera.rotation.y),
+                0,
+                -Math.sin(camera.rotation.y)
+            ).normalize();
+
+            if (keys.w) camera.position.addScaledVector(forward, speed);
+            if (keys.s) camera.position.addScaledVector(forward, -speed);
+            if (keys.a) camera.position.addScaledVector(right, -speed);
+            if (keys.d) camera.position.addScaledVector(right, speed);
+        }
 
         function animate() {
-            cube.rotation.x += 0.01;
-            cube.rotation.y += 0.01;
+            updateMovement();
             renderer.render(scene, camera);
             requestAnimationFrame(animate);
         }
@@ -90,4 +165,3 @@
     </script>
 </body>
 </html>
-
